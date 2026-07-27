@@ -17,3 +17,4 @@ celery_app.conf.update(
     accepted_content=["json"],              # Celery workers only accepts JSON data.
     result_expires=3600,            # TTL (Time To Live) for task results on Redis. After file conversion the file is saved on Redis, and kept there for 1 hour and deleted from there on to save space.
 )
+
