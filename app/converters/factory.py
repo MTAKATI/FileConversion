@@ -1,6 +1,6 @@
 from pathlib import Path
 from app.converters.base import BaseConversionStrategy
-from app.converters.strategies import PdfFixStrategy, ImageToPdfStrategy, DefaultStrategy
+from app.converters.strategies import PdfFixStrategy, ImageToPdfStrategy, DefaultStrategy, EbookToPdfStrategy
 
 # Chooses which strategy to use based on the input file's name or extension
 class ConverterFactory:
@@ -14,8 +14,12 @@ class ConverterFactory:
             return PdfFixStrategy()
 
         # Check image extensions
-        if ext in [".png", ".jpg", ".jpeg", ".bmp", ".tiff"]:
+        if ext in [".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"]:
             return ImageToPdfStrategy()
+
+        # E-books & Textbooks
+        if ext in [".epub", ".mobi", ".azw3", ".fb2", ".lit", ".prc", ".cbz"]:
+            return EbookToPdfStrategy()
 
         # Fallback default strategy
         return DefaultStrategy()
