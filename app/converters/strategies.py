@@ -3,7 +3,7 @@
 import shutil
 from pathlib import Path
 from PIL import Image
-from pypdf import PDFReader, PdfWriter 
+from pypdf import PdfReader, PdfWriter
 from app.converters.base import BaseConversionStrategy 
 
 class PdfFixStrategy(BaseConversionStrategy):

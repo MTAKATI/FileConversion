@@ -8,7 +8,7 @@ from celery import Celery   # Calls the background tasks from Celery library
 celery_app = Celery(
     "file_converter", #name of celery app module
     broker="redis://localhost:6379/0",      #redis running locally at the mentioned port and database 0
-    backend="redis: //localhost:6379/0"
+    backend="redis://localhost:6379/0",
 )
 
 celery_app.conf.update(
