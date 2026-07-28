@@ -1,6 +1,10 @@
 from fastapi import FastAPI, UploadFile, File
 from pathlib import Path
 from app.tasks import convert_file_task
+from celery.result import AsyncResult
+from app.celery_app import celery_app
+from fastapi.responses import FileResponse
+from fastapi import HTTPException
 
 app = FastAPI()
 
@@ -31,6 +35,34 @@ async def convert_file(file: UploadFile = File(...)):
         "status": "QUEUED"
     }
 
+# Task status endpoint: Frontend  calls this endpoint to check the status of a task.
+@app.get("/status/{task_id}")
+async def get_status(task_id: str):
+    task_result = AsyncResult(task_id, app=celery_app)
+
+    response = {
+        "task_id": task_id,
+        "status": task_result.status,   
+    }
+    if task_result.failed():
+        response["error"] = str(task_result.result)
+
+    return response
+
+# File Download Route: Once a task hits SUCCESS, gives client an endpoint to retrieve the finished conversion
+@app.get("/download/{filename}")
+async def download_file(filename: str):
+    # Search for file with matching output_dir
+    files = list(OUTPUT_DIR.glob(f"{filename}.*"))
+
+    if not files or not files[0].exists():
+        raise HTTPException(status_code=404, detail="Converted File not found")
+
+    return FileResponse(
+        path=files[0],
+        filename=files[0].name,
+        media_type="application/octet-stream"        
+    )
 
 def main():
     print("Starting file conversion process...")
