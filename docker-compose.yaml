@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:alpine
+    container_name: file_conversion_redis
+    ports:
+      - "6379:6379"
+
+  web:
+    build: .
+    container_name: file_conversion_web
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./output:/app/output
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  celery_worker:
+    build: .
+    container_name: file_conversion_worker
+    command: celery -A app.celery_app worker --loglevel=info
+    volumes:
+      - ./uploads:/app/uploads
+      - ./output:/app/output
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis

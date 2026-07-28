@@ -2,13 +2,16 @@
 # @author: Sandiso Mtakati
 # @date: 26/07/2026
 
-from celery import Celery   # Calls the background tasks from Celery library
+import os
+from celery import Celery
 
-# Establish connection between Redis and Celery
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
 celery_app = Celery(
-    "file_converter", #name of celery app module
-    broker="redis://localhost:6379/0",      #redis running locally at the mentioned port and database 0
-    backend="redis://localhost:6379/0",
+    "file_conversion",
+    broker=REDIS_URL,
+    backend=REDIS_URL,
+    include=["app.tasks"]  # Change to "tasks" if tasks.py is in the root directory
 )
 
 celery_app.conf.update(
