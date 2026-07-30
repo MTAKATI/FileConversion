@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File to PDF Converter</title>
+  <style>
+    * { box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+    .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 480px; text-align: center; }
+    h2 { margin-bottom: 1.5rem; color: #333; }
+    
+    /* Drag & Drop Styling */
+    .drop-zone { border: 2px dashed #007bff; border-radius: 8px; padding: 2rem; cursor: pointer; background: #f8f9fa; transition: background 0.2s; }
+    .drop-zone:hover, .drop-zone.dragover { background: #e9ecef; }
+    #fileInput { display: none; }
+    
+    /* Controls */
+    button { margin-top: 1.2rem; background: #007bff; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-size: 1rem; cursor: pointer; width: 100%; }
+    button:disabled { background: #6c757d; cursor: not-allowed; }
+    
+    /* Status Display */
+    .status-container { margin-top: 1.5rem; display: none; text-align: left; }
+    .status-box { padding: 0.75rem; border-radius: 6px; font-weight: bold; font-size: 0.9rem; text-align: center; }
+    .PENDING, .QUEUED { background: #fff3cd; color: #856404; }
+    .PROCESSING, .STARTED { background: #cce5ff; color: #004085; }
+    .SUCCESS { background: #d4edda; color: #155724; }
+    .FAILED, .FAILURE { background: #f8d7da; color: #721c24; }
+
+    .download-btn { display: block; margin-top: 1rem; text-decoration: none; background: #28a745; color: white; padding: 0.75rem; border-radius: 6px; text-align: center; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>File Converter to PDF</h2>
+    
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <p id="dropText">Drag & drop your file here, or click to browse</p>
+      <input type="file" id="fileInput" onchange="handleFileSelect(event)">
+    </div>
+
+    <button id="convertBtn" onclick="uploadFile()" disabled>Convert File</button>
+
+    <div class="status-container" id="statusContainer">
+      <div id="statusBox" class="status-box">Status: Waiting...</div>
+      <a id="downloadLink" href="#" class="download-btn" style="display: none;" download>Download PDF</a>
+    </div>
+  </div>
+
+  <script>
+    let selectedFile = null;
+
+    function handleFileSelect(event) {
+      if (event.target.files.length > 0) {
+        selectedFile = event.target.files[0];
+        document.getElementById('dropText').innerText = `Selected: ${selectedFile.name}`;
+        document.getElementById('convertBtn').disabled = false;
+      }
+    }
+
+    // Drag and Drop listeners
+    const dropZone = document.getElementById('dropZone');
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        selectedFile = e.dataTransfer.files[0];
+        document.getElementById('dropText').innerText = `Selected: ${selectedFile.name}`;
+        document.getElementById('convertBtn').disabled = false;
+      }
+    });
+
+    // 1. Upload file to backend
+    async function uploadFile() {
+      if (!selectedFile) return;
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      // Extract base filename without extension for download link matching
+      const originalFileName = selectedFile.name;
+      const baseName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) || originalFileName;
+
+      const convertBtn = document.getElementById('convertBtn');
+      const statusContainer = document.getElementById('statusContainer');
+      const downloadLink = document.getElementById('downloadLink');
+
+      convertBtn.disabled = true;
+      statusContainer.style.display = 'block';
+      downloadLink.style.display = 'none';
+      updateStatus('QUEUED', 'Uploading file...');
+
+      try {
+        const response = await fetch('/convert/', { method: 'POST', body: formData });
+        if (!response.ok) throw new Error('Upload failed');
+
+        const data = await response.json();
+        pollTaskStatus(data.task_id, baseName);
+      } catch (error) {
+        updateStatus('FAILED', `Error: ${error.message}`);
+        convertBtn.disabled = false;
+      }
+    }
+
+    // 2. Poll status endpoint every 2 seconds until completion
+    function pollTaskStatus(taskId, baseName) {
+      const interval = setInterval(async () => {
+        try {
+          const res = await fetch(`/status/${taskId}`);
+          const data = await res.json();
+
+          updateStatus(data.status, `Status: ${data.status}`);
+
+          if (data.status === 'SUCCESS') {
+            clearInterval(interval);
+            document.getElementById('convertBtn').disabled = false;
+            
+            // Show Download Button
+            const downloadLink = document.getElementById('downloadLink');
+            downloadLink.href = `/download/${baseName}`;
+            downloadLink.style.display = 'block';
+          } else if (data.status === 'FAILURE' || data.status === 'FAILED') {
+            clearInterval(interval);
+            document.getElementById('convertBtn').disabled = false;
+            updateStatus('FAILED', `Conversion Failed: ${data.error || 'Unknown Error'}`);
+          }
+        } catch (err) {
+          clearInterval(interval);
+          document.getElementById('convertBtn').disabled = false;
+          updateStatus('FAILED', 'Error checking status');
+        }
+      }, 2000);
+    }
+
+    function updateStatus(status, text) {
+      const statusBox = document.getElementById('statusBox');
+      statusBox.className = `status-box ${status}`;
+      statusBox.innerText = text;
+    }
+  </script>
+</body>
+</html>

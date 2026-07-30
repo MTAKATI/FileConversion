@@ -1,21 +1,29 @@
-from fastapi import FastAPI, UploadFile, File
 from pathlib import Path
-from app.tasks import convert_file_task
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse, HTMLResponse  # Correct import
 from celery.result import AsyncResult
+
+from app.tasks import convert_file_task
 from app.celery_app import celery_app
-from fastapi.responses import FileResponse
-from fastapi import HTTPException
 
-app = FastAPI()
+app = FastAPI(title="File Conversion API")
 
+# Ensure required directories exist
 UPLOAD_DIR = Path("uploads")
 OUTPUT_DIR = Path("output")
 
-# Ensure directories exist
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# 1. Server Frontend UI
+@app.get("/", response_class=HTMLResponse)
+async def read_index():
+    index_path = Path("app/templates/index.html")
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="Frontend template not found")
+    return index_path.read_text()
 
+# 2. Upload and Queue File Endpoint
 @app.post("/convert/")
 async def convert_file(file: UploadFile = File(...)):
     input_path = UPLOAD_DIR / file.filename
@@ -35,7 +43,7 @@ async def convert_file(file: UploadFile = File(...)):
         "status": "QUEUED"
     }
 
-# Task status endpoint: Frontend  calls this endpoint to check the status of a task.
+# Task status endpoint: Frontend calls this endpoint to check the status of a task.
 @app.get("/status/{task_id}")
 async def get_status(task_id: str):
     task_result = AsyncResult(task_id, app=celery_app)
